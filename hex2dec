@@ -1,0 +1,4 @@
+#!/bin/bash
+HEXA=$1
+echo "obase=10; $HEXA"|bc
+

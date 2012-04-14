@@ -1,0 +1,5 @@
+#!/bin/bash
+if [ test -x /tmp/md5 ];
+    md5sum -v -c /tmp/md5 | & grep -v "OK"    
+fi
+find /etc /usr/bin -type f -exec md5sum {} \; > /tmp/md5

@@ -1,0 +1,54 @@
+#!/bin/csh
+#
+# Convert AVCHD (MTS/M2TS) files into Quicktime movies (MOV)
+# 2009/03/13 - Romain KUNTZ 
+#
+# Mostly inspired by the tutorial and examples from:
+# http://wesleybailey.com/articles/m2tstoavi-avchd
+#
+
+    if ( $#argv == "0" ) then
+        echo usage: $0 filename.m2ts ...
+        exit
+    else
+        set files=($*)
+    endif
+
+    set path = ( . $path )
+
+    echo using:
+    which ffmpeg || exit
+
+    foreach file ($files)
+        if ( ! -f $file ) then
+            echo file $file not found
+            exit
+        endif
+
+        set filebase=`basename $file | sed s/\.m2ts// | sed s/\.MTS//`
+        set passfile="passfile.mov"
+        set outputfile=$filebase".mov"
+
+        # 2-pass encoding
+        # You can modify the -s and -b parameter to 
+        # increase/decrease the quality of the video. 
+        # See the ffmpeg manpage
+        if ( ! -f $outputfile ) then
+            # Pass 1
+            ffmpeg -i $file -pass 1 \
+                      -acodec libfaac -ab 128k -ac 2 -ar 44100 \
+                      -vcodec mpeg4 -aspect 16:9 \
+                      -s hd720 -b 10000k \
+                      -copyts $passfile
+            # Pass 2
+            ffmpeg -i $passfile -pass 2 \
+                      -acodec libfaac -ab 128k -ac 2 -ar 44100 \
+                      -vcodec mpeg4 -aspect 16:9 \
+                      -s hd720 -b 10000k \
+                      -copyts $outputfile 
+            # Remove junk files
+            rm $passfile ffmpeg2pass-0.log
+        else
+            echo $outputfile exists, not creating it.
+        endif
+    end

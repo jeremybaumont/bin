@@ -1,0 +1,14 @@
+#!/bin/bash
+SAVEIFS=$IFS
+IFS=$(echo -en "\n\b")
+for f in *
+do
+  FILENOSPACE=`echo "$f" | sed -e 's/ /_/g'`
+  FILENOCOMMA=`echo $FILENOSPACE | sed -e 's/,//g'`  
+  FILENOSEMICOLON=`echo $FILENOCOMMA | sed -e 's/;//g'`  
+  FILENOTIMESTAMP=`echo $FILENOSEMICOLON | sed -e 's/[0-9]\{5,20\}//g'`  
+  FILENOMULTPOINTS=`echo $FILENOTIMESTAMP | sed -e 's/\.\{2,4\}/./g'`  
+  echo "renaming $f to  $FILENOMULTPOINTS"
+  mv "$f" $FILENOMULTPOINTS  
+done
+IFS=$SAVEIFS

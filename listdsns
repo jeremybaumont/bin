@@ -1,0 +1,41 @@
+#!/usr/bin/perl 
+#===============================================================================
+#
+#         FILE:  listdsns.pl
+#
+#        USAGE:  ./listdsns.pl 
+#
+#  DESCRIPTION:  
+#
+#      OPTIONS:  ---
+# REQUIREMENTS:  ---
+#         BUGS:  ---
+#        NOTES:  ---
+#       AUTHOR:   (), <>
+#      COMPANY:  
+#      VERSION:  1.0
+#      CREATED:  12/04/2007 10:48:15 AM CET
+#     REVISION:  ---
+#===============================================================================
+
+use strict;
+use warnings;
+
+use DBI;
+
+### Probe DBI for the install drivers
+my @drivers = DBI->available_drivers();
+
+die "No drivers found!\n" unless @drivers;
+
+### Iterate through the drivers and list the data sources for each one
+foreach my $driver ( @drivers ) {
+    print "Driver: $driver\n";
+    my @data_sources = DBI->data_sources( $driver);
+    foreach my $data_source ( @data_sources) {
+        print "\tData Source is $data_source\n";
+    }
+    print "\n";   
+}
+exit;
+

@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Usage rev_installed_dependencies <package_name>
+
+if [ "$1" == "" ]; then
+    echo "ERROR - You did not give package name"
+    exit 1
+else
+    echo "INFO - Looking for dependencies installed for the package $1"
+fi
+
+sudo apt-cache rdepends "$1" | tail -n+3 | xargs -n 1 -i aptitude search {} | egrep '^i'
+exit 0

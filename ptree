@@ -1,0 +1,2 @@
+#!/bin/sh
+pstree -a -p `pstree -G -a -p -H $1 | grep '1m.*0m' | head -2 | tail +2 | sed -e 's/^.*,//' -e 's/).*$//'`

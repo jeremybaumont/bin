@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+# Reads the parameters from the command line.
+baseName=$1
+
+# Tests if the base name was specified.
+if [ "$baseName" = "" ]; then
+	baseName="myrecording"
+fi
+
+# Starts audio recording.
+arecord --quiet --file-type wav --rate=44000 > "$baseName.wav" &
+pidA=$(ps -ef | grep "[a]record" | awk '{print $2}')
+echo "Audio recording started with process ID $pidA"
+
+# Starts recordmydesktop without 
+ffmpeg -f x11grab -s 1024x768 -r 30 -i :0.0 "$baseName.avi" 
+
+# Waits for the user to press enter.
+echo ""
+echo "Press ENTER to finish."
+read nothing
+
+
+
+
+
+# Converts the audio to mp3.
+lame -m j -h --vbr-new -b 128 "$baseName.wav" -o "$baseName.mp3"
+
+# Merges them into the final avi.
+mencoder  -ovc copy -oac copy -audiofile "$baseName.mp3" "$baseName.avi" -o "$baseName-final.avi"
+
+echo ""
+echo "DONE! Final video written in file $baseName-final.avi"
+
+rm $baseName.wav $baseName.mp3 $baseName.avi

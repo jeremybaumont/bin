@@ -1,0 +1,4 @@
+#!/bin/bash
+echo "Mailing attachment $1 to email $2" 
+uuencode $1 | mailx -s "Attachment sent" $2 
+echo "Done..."

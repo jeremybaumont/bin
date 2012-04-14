@@ -1,0 +1,49 @@
+#!/bin/bash
+#!/bin/bash
+#
+# Script to perform some common system operations
+#
+AMD_DIR=$HOME/doc/amd
+while :
+do
+clear
+echo "**********************************"
+echo "* Open AMD Documentation Books *"
+echo "**********************************"
+echo "* [1] AMD64_Architecture_Programmer_Manual_vol1_Application_Programming *"
+echo "* [2] AMD64_Architecture_Programmer_Manual_vol2_System_Programming *"
+echo "* [3] AMD64_Architecture_Programmer_Manual_vol3_System_Instructions *"
+echo "* [4] AMD64_Architecture_Programmer_Manual_vol4_128bit_256bit_Media_Instructions.pdf *"
+echo "* [5] AMD64_Architecture_Programmer_Manual_vol5_64bit_Media_x87_Floating_Point_Instructions.pdf *"
+echo "* [0] Exit/Stop *"
+echo "************************"
+echo -n "Enter your menu choice [0-9]: "
+read yourch
+case $yourch in
+1) 
+	evince $AMD_DIR/AMD64_Architecture_Programmer_Manual_vol1_Application_Programming.pdf &
+	exit 0; 
+;;
+2) 
+	evince $AMD_DIR/AMD64_Architecture_Programmer_Manual_vol2_System_Programming.pdf & 
+	exit 0;
+;;
+3) 
+	evince $AMD_DIR/AMD64_Architecture_Programmer_Manual_vol3_System_Instructions.pdf &
+	exit 0; 
+;;
+4) 
+	evince $AMD_DIR/AMD64_Architecture_Programmer_Manual_vol4_128bit_256bit_Media_Instructions.pdf &
+	exit 0;
+;;
+5) 
+	evince $AMD_DIR/intel_dev_manual_vol3b_sys_programming_part2.pdf & 
+	exit 0;
+;;
+0) 
+	exit 0;
+;;
+*) echo "Oopps!!! Please select choice 1,2,3 or 4";
+echo "Press Enter to continue. . ." ; read ;;
+esac
+done

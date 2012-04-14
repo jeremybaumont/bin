@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+epoch=$1
+[ $# -eq 0 ] && { echo "Usage: $0 format" ; exit 1; }
+echo "Converting epoch date ${epoch} to human readable date..."
+date --date="1970-01-01 $epoch sec UTC"

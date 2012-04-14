@@ -1,0 +1,59 @@
+#!/bin/bash
+################################################################################
+# Script: colorlog.sh                  Version: 1.4
+# Author: Tako van Gaalen              Created: 17 March 2008
+#
+# Description:
+#
+# Colors important lines in logfiles for easy viewing
+#
+# Author:             Date:            Changes:
+#------------------------------------------------------------------History------
+# Tako van Gaalen     18/03/2008       Added date hilighting
+# Tako van Gaalen     18/03/2008       Added compressed file support
+# Tako van Gaalen     19/03/2008       Added startup/shutdown colors
+#
+#
+#
+################################################################################
+
+### Beginning of variables ###
+
+VERSION="1.4"
+
+USAGE="colorlog.sh: usage: colorlog.sh <file>"
+
+RED=`echo -en '\e[31m'`
+REDB=`echo -en '\e[31;1m'`
+BLUE=`echo -en '\e[36m'`
+GREEN=`echo -en '\e[32m'`
+GREENB=`echo -en '\e[32;1m'`
+YELLOW=`echo -en '\e[33m'`
+WHITE=`echo -en '\e[37;0m'`
+BOLD=`echo -en '\e[36;1m'`
+
+TODAY=`date '+%Y-%m-%d'`
+
+
+
+### End of variables ###########################################################
+
+if [ "$1" = "" ]
+        then
+        echo $USAGE
+        elif [ `ls -l $1 | grep ".gz" | wc -l` = "1" ]
+                then
+                gzip -dc $1 | sed -e "s/\($TODAY\)/$BOLD\1$WHITE/g" -e "s/\(FATAL.*[! ]*\)/$REDB\1$WHITE/g" -e "s/\(shutdown.*[! ]*\)/$REDB\1$WHITE/g" -e "s/\(Bootstrapping.*[! ]*\)/$GREENB\1$WHITE/g" -e "s/\(ERROR.*[! ]*\)/$RED\1$WHITE/g" -e "s/\(WARN.*[! ]*\)/$YELLOW\1$WHITE/g" -e "s/\(http:\/\/[^ ]*\)/$GREEN\1$WHITE/g" -e "s/\(_function.*[! ]*\)/$BLUE\1$WHITE/g" $1
+        else
+sed -e "s/\($TODAY\)/$BOLD\1$WHITE/g" -e "s/\(FATAL.*[! ]*\)/$REDB\1$WHITE/g" -e "s/\(shutdown.*[! ]*\)/$REDB\1$WHITE/g" -e "s/\(Bootstrapping.*[! ]*\)/$GREENB\1$WHITE/g" -e "s/\(ERROR.*[! ]*\)/$RED\1$WHITE/g" -e "s/\(WARN.*[! ]*\)/$YELLOW\1$WHITE/g" -e "s/\(http:\/\/[^ ]*\)/$GREEN\1$WHITE/g" -e "s/\(_function.*[! ]*\)/$BLUE\1$WHITE/g" $1
+fi
+
+### END OF SCRIPT ###
+
+
+
+
+
+
+
+

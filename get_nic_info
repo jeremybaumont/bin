@@ -1,0 +1,2 @@
+#!/bin/sh
+kstat -p :::duplex :::ifspeed

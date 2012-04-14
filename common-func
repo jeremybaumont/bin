@@ -1,0 +1,130 @@
+#!/bin/sh:w
+
+
+EXITCODE=0
+
+attente(){
+    PROC=$( pgrep  $1)
+    $* &
+
+    while [ -d /proc/$PROC ];do
+        echo -en ' Running, please wait... /\033[1G' ; sleep .07
+        echo -en ' Running, please wait... -\033[1G' ; sleep .07
+        echo -en ' Running, please wait... \ \033[1G' ; sleep .07
+        echo -en ' Running, please wait... |\033[1G' ; sleep .07
+# echo -en ' <DesEspacesIciSiBesoin> \033[1G'
+        done
+
+}
+
+
+# Return an error message and usage string
+error()
+{
+    echo "$@" 1>&2;
+    usage_and_exit 1;
+}
+
+# Print the usage of the script and exit properly
+usage_and_exit()
+{
+    usage
+    exit $1
+}
+
+# Return the current version of the script
+version()
+{
+    echo "$PROGRAM version $VERSION"
+}
+
+# Return a warning
+warning()
+{
+    echo "$@" 1>&2;
+    EXITCODE=`expr $EXITCODE + 1`
+}
+
+# Log a message on the output and exit properly
+log_and_exit()
+{
+    local type="$1"
+    shift
+    local message="$*"
+    log $type $message
+    exit $EXITCODE
+}
+
+# Log a message on the output
+log()
+{
+    local type="$1"
+    shift
+    local message="$*"
+    local dataflags="+%Y.%m.%d,%H:%M:%S"
+ 
+    echo "[$type] - `date $dataflags` - $message"
+}
+
+
+# Log messages are printed only if the _DEBUG variable is set to true.
+# shell> _DEBUG=true ./example_script.sh
+_debug() {
+  if [ "$_DEBUG" == "true" ]; then
+    echo 1>&2 "$@"
+  fi
+}
+
+
+# Test the presence of a mail client
+#
+# Called like: test_mail_client
+# Returns: nothing
+test_mail_client()
+{
+    for MAIL in /bin/mailx /usr/bin/mailx /usr/sbin/mailx /usr/ucb/mailx \
+            /bin/mail /usr/bin/mail
+    do
+        test -x $MAIL && break
+    done
+    
+    test -x $MAIL || log_and_exit "ERROR" "Cannot find mail client :("
+    log "INFO" "Find a mail client: $MAIL" 
+}
+
+# Let the user make a choice about something and execute code based on
+# the answer
+#
+# Called like: choose <default (y or n)> <prompt> <yes action> <no
+# action>
+# e.g. choose "y" \
+#       "Do you want to play a game?" \
+#       /usr/games/GlobalThermonucularWar \
+#       'printf "%b" "See you later Professor Falkin."' >&2
+# Returns: nothing
+choose ()
+{
+    local fusage="usage: choose <default (y or n)> <prompt> <yes action> <no action>"
+    local default="${1:?"Error ${fusage}"}"
+    local prompt="${2:?"Error ${fusage}"}"
+    local choice_yes="${3:?"Error ${fusage}"}"
+    local choice_no="${4:?"Error ${fusage}"}"
+    local answer
+    local dataflags="+%Y.%m.%d-%H:%M:%S"
+
+    read -p "[INFO] - `date $dataflags` - $prompt "  answer
+
+    [ -z "$answer" ] && answer="$default"
+    case "$answer" in
+        [yY1] ) log "INFO" $choice_yes 
+	     $choice_yes 
+             # error check
+             ;;
+        [nN0] ) log_and_exit "ERROR" $choice_no 
+
+            # error check
+            ;;
+         *     ) log "WARNING"  "Unexpected answer '$answer'!";;
+    esac
+} 
+

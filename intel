@@ -1,0 +1,64 @@
+#!/bin/bash
+#!/bin/bash
+#
+# Script to perform some common system operations
+#
+INTEL_DIR=$HOME/doc/intel
+while :
+do
+clear
+echo "**********************************"
+echo "* Open Intel Documentation Books *"
+echo "**********************************"
+echo "* [1] intel_dev_manual_vol1_architecture *"
+echo "* [2] intel_dev_manual_vol2a_isa_ref_A-M *"
+echo "* [3] intel_dev_manual_vol2b_isa_ref_N-Z *"
+echo "* [4] intel_dev_manual_vol3a_sys_programming *"
+echo "* [5] intel_dev_manual_vol3b_sys_programming *"
+echo "* [6] intel_dev_manual_TLB_paging-struct_caches *"
+echo "* [7] intel_dev_manual_doc_changes *"
+echo "* [8] iintel_486_Architecture *"
+echo "* [0] Exit/Stop *"
+echo "************************"
+echo -n "Enter your menu choice [0-9]: "
+read yourch
+case $yourch in
+1) 
+	evince $INTEL_DIR/intel_dev_manual_vol1_architecture.pdf & 
+	exit 0; 
+;;
+2) 
+	evince $INTEL_DIR/intel_dev_manual_vol2a_isa_ref_A-M.pdf & 
+	exit 0;
+;;
+3) 
+	evince $INTEL_DIR/intel_dev_manual_vol2b_isa_ref_N-Z.pdf & 
+	exit 0; 
+;;
+4) 
+	evince $INTEL_DIR/intel_dev_manual_vol3a_sys_programming_part1.pdf & 
+	exit 0;
+;;
+5) 
+	evince $INTEL_DIR/intel_dev_manual_vol3b_sys_programming_part2.pdf & 
+	exit 0;
+;;
+6) 
+	evince $INTEL_DIR/intel_dev_manual_TLB_paging-struct_caches.pdf & 
+	exit 0;
+;;
+7) 
+	evince $INTEL_DIR/intel_dev_manual_doc_changes.pdf & 
+	exit 0;
+;;
+8) 
+	evince $INTEL_DIR/intel_486_Architecture.pdf & 
+	exit 0;
+;;
+0) 
+	exit 0;
+;;
+*) echo "Oopps!!! Please select choice 1,2,3 or 4";
+echo "Press Enter to continue. . ." ; read ;;
+esac
+done

@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Script to run a command across multiple machines
+# Usage: rr "host01 host02 ..." "cmd01; cmd02; ..."
+
+# Global options
+error()
+{
+    echo "$@" 1>&2;
+    usage_and_exit 1;
+}
+
+usage()
+{
+    echo "Usage: $PROGRAM  [--?] [--help] [--version]  "
+}
+
+usage_and_exit()
+{
+    usage
+    exit $1
+}
+
+version()
+{
+    echo "$PROGRAM version $VERSION"
+}
+
+warning()
+{
+    echo "$@" 1>&2;
+    EXITCODE=`expr $EXITCODE + 1`
+}
+
+EXITCODE=0
+PROGRAM=`basename $0`
+VERSION=1.0
+
+while test $# -gt 0
+do
+    case $1 in
+    --help | --hel | --he | --h | '--?' | -help |\
+    -hel | -he | -h | '-?')
+        usage_and_exit 0
+        ;;
+    --version | --versio | --vers | --ver | --ve | --v | \
+    -version | -versio | -vers | -ver | -ve | -v)
+        version
+        exit 0
+        ;;
+    -*)
+        error "Unrecognized option: $1"
+        ;;
+    *)
+        break
+        ;;
+    esac
+    shift
+done
+
+test $# -gt 0 && usage_and_exit()
+
+
+TIMEOUT=10
+ERRLOG=/tmp/remote-err-$$.log
+OUTLOG=/tmp/remote-out-$$.log
+
+# Extract the command line
+
+MACHINES=$1;shift
+COMMAND=$1;shift
+
+for machine in $MACHINES
+do
+    echo $machine
+    ssh -oConnectTimeout=$TIMEOUT $machine $COMMAND >>$OUTLOG 2 >>$ERRLOG
+
+done
+
+cat $OUTLOG
+cat $ERRLOG >&2
+rm -f $OUTLOG $ERRLOG

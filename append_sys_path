@@ -1,0 +1,16 @@
+#!/usr/local/bin/python
+import sys
+
+new_dir = sys.argv[1]
+
+print "Python sys path before append: "
+print sys.path
+print
+
+print "Append the directory" + new_dir
+sys.path.append(new_dir)
+print
+
+print "Python sys path after appending: "
+print sys.path 
+print

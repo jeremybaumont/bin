@@ -1,0 +1,587 @@
+#!/usr/bin/perl
+#
+# psio10 - a "ps -ef" style tool that prints out disk %I/O. Solaris 10.
+#
+# This is designed to highlight processes that are causing the most disk I/O.
+#  This version of psio uses DTrace (Solaris 10). There are other versions
+#  of psio for older Solaris or the SE Toolkit.
+#
+# NOTE: This is old and nasty - the code needs an overhaul for Solaris 10 FCS.
+#       in the meantime, use iosnoop or prustat instead. Eg,
+#
+#               http://www.brendangregg.com/DTrace/iosnoop
+#
+# 12-Mar-2004, ver 0.71         (check for newer versions)
+#
+#
+# USAGE: psio10 [-efhnx] [seconds]
+#        psio10 [-efhnx] -i infile
+#        psio10 -o outfile [seconds]
+#
+#       psio10             # default "ps -ef" style output, 1 second sample
+#       psio10 5           # sample for 5 seconds
+#       psio10 -e          # event listing (raw and verbose)
+#       psio10 -f          # full device output, print lines per device
+#       psio10 -h          # print usage
+#       psio10 --help      # print full help
+#       psio10 -i infile   # read from infile (a psio dump)
+#       psio10 -n          # numbered output, Time(ms) Size(bytes) and Count
+#       psio10 -o outfile  # write to outfile (create a psio dump)
+#       psio10 -s          # reduced output, PID, %I/O and CMD only
+#       psio10 -x          # extended output, %I/Ot %I/Os %I/Oc %CPU and %MEM
+#
+# To conduct careful analysis first write to an "-o outfile", then run psio
+#  with different options on the "-i infile" (eg, "-x", "-n", "-fn", "-e").
+#
+#
+# FIELDS:
+#       %I/O    %I/O by time taken - duration of disk operation over 
+#               available time (most useful field)
+#       %I/Ot   same as above
+#       %I/Os   %I/O by size - number of bytes transferred over total bytes
+#               in sample
+#       %I/Oc   %I/O by count - number of operations over total operations
+#               in sample
+#       IOTIME  Time taken for I/O (ms)
+#       IOSIZE  Size of I/O (bytes)
+#       IOCOUNT Count of I/O (number of operations)
+#       DEVICE  Device number or mount point name, eg "/var".
+#       BLOCK   Block address on disk
+#       INODE   Inode number
+#
+# WARNING: psio may use a large amount of memory if long samples are used
+#  on busy systems.
+#
+# SEE ALSO:     se -DWIDE pea.se        # SE Toolkit
+#               http://www.brendangregg.com/psio.html
+#
+# COPYRIGHT: Copyright (c) 2004 Brendan Gregg.
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version. 
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details. 
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software Foundation, 
+#  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+#
+#  (http://www.gnu.org/copyleft/gpl.html)
+#
+# Author: Brendan Gregg  [Sydney, Australia]
+#
+# Todo: 
+#  * Process raw I/O as well as block I/O.
+#  * Add direction (In or Out) to event mode.
+#
+# 12-Mar-2004   Brendan Gregg   Created this, based on original psio.
+
+
+use Getopt::Std;
+
+#
+# --- Default Variables ---
+#
+$period = 1;                            # seconds to sample
+$ENV{PATH} = "/usr/bin:/usr/sbin";      # secure $PATH
+$DEBUG = 0;                             # print debug info
+$BYDEVICE = 0;                          # print by device
+$STYLE = 0;                             # normal "ps -ef" style
+$EVENT = 0;                             # event mode (list all operations)
+$OUTPUT = 0;                            # file output mode
+$INPUT = 0;                             # file input mode
+$Bit = `isainfo -b`;                    # determine bit size
+chomp($Bit);
+
+
+#
+# --- Command Line Arguments ---
+#
+&Help() if $ARGV[0] eq "--help";
+getopts('efhnsxDi:o:') || &Usage();
+&Usage() if $opt_h;
+$DEBUG = 1 if $opt_D;
+$BYDEVICE = 1 if $opt_f;
+$STYLE = 1 if $opt_x;           
+$STYLE = 2 if $opt_s;           
+$STYLE = 3 if $opt_n;
+$EVENT = 1 if $opt_e;
+$STYLE = -1 if $opt_e;
+$OUTPUT = 1 if $opt_o;
+$fileout = $opt_o if $OUTPUT;
+$INPUT = 1 if $opt_i;
+$filein = $opt_i if $INPUT;
+$period = $ARGV[0] || $period;
+&Usage() unless $period =~ /^\d*$/;
+
+
+### Load device info if needed
+&Load_DeviceInfo() if (($BYDEVICE || $EVENT || $OUTPUT) && (! $INPUT));
+
+
+#
+# --- Print header line ---
+#
+print "Please wait $period seconds, collecting data...\n" if $DEBUG;
+unless ($OUTPUT) {
+    if ($STYLE == 0) {
+        print "     UID   PID  PPID %I/O    STIME TTY      TIME CMD\n";
+    } elsif ($STYLE == 1) {
+        print "     UID   PID %CPU %I/Ot %I/Os %I/Oc %MEM S   ".
+         "TIME CMD\n";
+    } elsif ($STYLE == 2) {
+        print "   PID %I/O CMD\n";
+    } elsif ($STYLE == 3) {
+        print "     UID   PID  IOTIME    IOSIZE IOCOUNT CMD\n";
+    } elsif ($EVENT) {
+        print "     UID   PID IOTIME IOSIZE BLOCK     DEVICE        ".
+         "INODE CMD\n";
+    }
+}
+
+
+if ($INPUT) {
+    #
+    # --- Read input from file ---
+    #
+    open(IN,$filein) || die "ERROR10: Can't read infile $filein: $!\n";
+
+    $line = <IN>;
+    ($junk,$period) = split(' ',$line);
+
+    $delim = 0;
+    while ($line = <IN>) {
+        if ($line =~ /^==========================/) {
+            $delim++;
+            next;
+        }
+        if ($delim == 0) {
+            $ps_all .= $line;
+        } elsif ($delim == 1) {
+            push(@DTRACE,$line);
+        } elsif ($delim == 2) {
+            ($key,$value) = split(/:/,$line);
+            chomp($value);
+            $DeviceFile{$key} = $value;
+        } elsif ($delim == 3) {
+            ($key,$value) = split(/:/,$line);
+            chomp($value);
+            $MountPoint{$key} = $value;
+        }
+    }
+} else {
+    #
+    # --- Sanity Check ---
+    #
+    if (! -r "/dev/mem") {
+        die "ERROR1: Sorry, you must be root to run this.\n";
+    }
+
+    #
+    # --- Generate I/O data from DTrace ---
+    #
+    open(DTRACE,"dtrace -q -n \"
+
+       /*
+       **  --- DTrace program to capture I/O ---
+       */
+
+       /* Initialise sample interval */
+
+       dtrace:::BEGIN { secs = $period; }
+       profile:::tick-1sec { secs--; }
+       profile:::tick-1sec /secs == 0/ { exit(0); }
+
+       /* Fetch disk block activity */
+    
+       fbt:genunix:bdev_strategy:entry
+       {
+        bufp = (buf_t *)arg0;
+    
+        printf(\\\"%d %s %d %d %d %d %d %d %s\\n\\\",
+         timestamp,probefunc,bufp->b_bcount,bufp->b_edev,
+         bufp->_b_blkno._f,pid,curpsinfo->pr_ppid,
+         curpsinfo->pr_euid,curpsinfo->pr_psargs);
+       }
+
+       fbt:genunix:biodone:entry
+       {
+        bufp = (buf_t *)arg0;
+        pagep = (page_t *)bufp->b_pages;
+        vnodep = (int)pagep == 0 ? 0 : (vnode_t *)pagep->p_vnode;
+        vnode =  (int)vnodep == 0 ? 0 : (int)vnodep;
+        inodep = (int)vnodep == 0 ? 0 : (inode_t *)vnodep->v_data;
+        inode =  (int)inodep == 0 ? 0 : inodep->i_number;
+    
+        printf(\\\"%d %s %d %d %d %x %d\\n\\\",
+         timestamp,probefunc,bufp->b_bcount,bufp->b_edev,
+         bufp->_b_blkno._f,vnode,inode);
+       }
+
+    \" |") || die "ERROR2: Can't run dtrace: $!\n is this Solaris 10?\n";
+
+    @DTRACE = <DTRACE>;
+    close DTRACE;
+
+    #
+    # --- Get ps data ---
+    #
+    $ps_all = 
+     `ps -eo pid,ruser,ppid,c,stime,tty,time,rss,vsz,pcpu,pmem,s,args` || 
+        die "ERROR3: Can't run \"ps -eo pid,uid,...\": $!\n";
+    
+}
+
+
+#
+# --- Save output file and exit if requested ---
+#
+if ($OUTPUT) {
+    open(OUT,">$fileout") || die "ERROR9: Can't write to $fileout: $!\n";
+    print OUT "period $period\n";
+    print OUT $ps_all;
+    print OUT "="x80,"\n";
+    print OUT @DTRACE;
+    print OUT "="x80,"\n";
+    print OUT $devicefiles;
+    print OUT "="x80,"\n";
+    print OUT $mountpoints;
+    close OUT;
+    exit (0);
+}
+
+
+#
+# --- Process ps data ---
+#
+foreach $line (split("\n",$ps_all)) {
+    next if $line =~ /^\s*PID/;
+    ($pid,$rest) = split(' ',$line,2);
+
+    ### Store in memory
+    $Ps{$pid} = $rest;
+}
+
+
+#
+# --- Process I/O trace results ---
+#
+
+$totalio_time = 0;
+$totalio_size = 0;
+$totalio_count = 0;
+
+foreach $line (@DTRACE) {
+    chomp($line);
+
+    ### Get data
+    ($elapsed,$probe,$size,$dev,$blk,$rest) = split(' ',$line,6);
+    next if $probe eq "";
+    $elapsed = $elapsed / 1_000_000;    # ns -> ms
+
+    #
+    #  Store value - the time between I/O events
+    #  These are usually the times between,
+    #   strategy -> biodone             # block device
+    #
+    if ($probe eq "bdev_strategy") {
+
+        ($pid,$ppid,$uid,$args) = split(' ',$rest,4);
+
+        $Strategy{"$dev:$blk"} = $pid;
+        $LastDev{"$dev"} = $elapsed;
+
+        ### Store process details in case ps -ef dosen't see it
+        $DT_Ps{$pid}{args} = $args;
+        $DT_Ps{$pid}{ppid} = $ppid;
+        $DT_Ps{$pid}{uid} = $uid;
+
+    } elsif ($probe eq "biodone") {
+
+        if (defined $Strategy{"$dev:$blk"}) {
+
+            ($vnode,$inode) = split(' ',$rest);
+
+            ## $start = $StrategyStart{"$dev:$blk"};
+            ## $truedelta = $elral consecutive 
+            #  completions (tagged queueing). By counting the 
+            #  deltas between all the requests within the group 
+            #  can over-count the actual service time.
+            #
+            #  What is simple (and would be a "last resort") is
+            #  to use the delta time in this event. This works
+            #  most of the time - but can give poor results during
+            #  simultaneous multiple disk access. Eg, a fast
+            #  disk is accessed while a slow disk as accessed - 
+            #  the delta on the slow disk completions can often
+            #  be the delta to the last fast disk event - recording
+            #  smaller than expected times.
+            #
+            #  Instead of the above we use the delta time between 
+            #  this event and the last disk event on the device. 
+            #  This gives almost perfect results (we still miss
+            #  the small time taken to populate the tagged queue).
+            #
+            if (defined $LastDev{"$dev"}) {
+                $truedelta = $elapsed - $LastDev{"$dev"};
+                delete $LastDev{"$dev"};
+            } else {
+                $truedelta = 0;
+            }
+
+            ### Fetch who really called this
+            $pid = $Strategy{"$dev:$blk"};
+
+            ### Store I/O time
+            $Delta{$pid} += $truedelta;
+            $DeltaDev{$pid}{$dev} += $truedelta;
+            $totalio_time += $truedelta;
+            
+            ### Store I/O size
+            $Size{$pid} += $size;
+            $SizeDev{$pid}{$dev} += $size;
+            $totalio_size += $size;
+
+            ### Store I/O count
+            $Count{$pid}++;
+            $CountDev{$pid}{$dev}++;
+            $totalio_count++;
+
+            ### Store event details
+            if ($EVENT) {
+                $Event{$elapsed}{pid} = $pid;
+                $Event{$elapsed}{size} = $size;
+                $Event{$elapsed}{dev} = $dev;
+                $Event{$elapsed}{block} = $blk;
+                $Event{$elapsed}{delta} = $truedelta;
+                $Event{$elapsed}{vnode} = $vnode;
+                $Event{$elapsed}{inode} = $inode;
+            }
+
+            delete $Strategy{"$dev:$blk"};
+            print "Stored: PID($pid) Delta($truedelta)" .
+             " strategy -> biodone\n" if $DEBUG;
+            
+        }
+        $LastDev{"$dev"} = $elapsed;
+    } 
+}
+
+### Prevent divide by zero
+$totalio_time = 1000 if $totalio_time == 0;
+$totalio_size = 1 if $totalio_size == 0;
+$totalio_count = 1 if $totalio_count == 0;
+
+
+### Cap total I/O time at 100% - either heavy multiple disk access or
+###                              sampling errors (didn't sleep exactly)
+$factor = 1;
+$factor = (1000 * $period) / $totalio_time if $totalio_time > (1000 * $period);
+
+
+# 
+# --- Print event data cpu,
+             $pmem,$s,$args) = split(' ',$line,12);
+        }
+
+        ### Print formatted output
+        printf("%8s %5s %6.0f %6s %-9s %-12s %6s %s\n",$ruser,$pid,
+         $delta,$size,$block,$device,$inode,$args);
+    }
+    exit (0);
+}
+
+
+#
+# --- Print ps data with I/O ---
+#
+foreach $pid (sort {$Delta{$b} <=> $Delta{$a}} (keys(%Delta))) {
+    $delta = $Delta{$pid};
+    $size = $Size{$pid};
+    $count = $Count{$pid};
+
+    #
+    #  Calculate percentages
+    #
+    $pcntio_time = $factor * $delta / (10 * $period); #/10 is ms -> %
+    $pcntio_time = sprintf("%.1f",$pcntio_time);
+    $pcntio_size = 100 * $size / $totalio_size;       # *100 makes it %
+    $pcntio_size = sprintf("%.1f",$pcntio_size);
+    $pcntio_count = 100 * $count / $totalio_count;    # *100 makes it %
+    $pcntio_count = sprintf("%.1f",$pcntio_count);
+
+    ### Get process data
+    $line = $Ps{$pid};
+
+    #
+    #  Some processes will begin and end too quickly - they
+    #  will be seen by DTrace but not during the ps -ef sample,
+    #  in which case we use the details from DTrace instead of ps.
+    #
+    if ($line eq "") {
+        ($ruser,$ppid,$c,$stime,$tty,$time,$rss,$vsz,$pcpu,$pmem,$s,
+         $args) = qw(? ? ? ? ? ? ? ? ? ? ?);
+
+        ### Check if DTrace caught these details
+        if (defined $DT_Ps{$pid}{uid}) {
+            $uid = $DT_Ps{$pid}{uid};
+            $ppid = $DT_Ps{$pid}{ppid};
+            $args = $DT_Ps{$pid}{args};
+            @Fields = getpwuid($uid);
+            $ruser = $Fields[0];
+        } 
+    } else {
+        ($ruser,$ppid,$c,$stime,$tty,$time,$rss,$vsz,$pcpu,$pmem,$s,
+         $args) = split(' ',$line,12);
+        $stime =~ tr/_/ /;
+    }
+
+    #
+    #  Format and print output
+    #
+    if ($STYLE == 0) {
+        printf("%8s %5s %5s %4s %8s %-6s %6s %s\n",$ruser,$pid,$ppid,
+         $pcntio_time,$stime,$tty,$time,$args);
+    } elsif ($STYLE == 1) {
+        printf("%8s %5s %4s %5s %5s %5s %4s %1s %6s %s\n",$ruser,$pid,
+         $pcpu,$pcntio_time,$pcntio_size,$pcntio_count,$pmem,$s,
+         $time,$args);
+    } elsif ($STYLE == 2) {
+        printf("%6s %4s %s\n",$pid,$pcntio_time,$args);
+    } elsif ($STYLE == 3) {
+        printf("%8s %5s %7.0f %9s %7s %s\n",$ruser,$pid,$delta,
+         $size,$count,$args);
+    }
+
+    #
+    #  Now print results on a device by device basis, if requested
+    #
+    if ($BYDEVICE) {
+       foreach $dev (sort {$DeltaDev{$pid}{$b} <=> 
+        $DeltaDev{$pid}{$a}} (keys(%{$DeltaDev{$pid}}))) {
+
+        ### Calculate percentages
+        $delta = $DeltaDev{$pid}{$dev};
+        $size = $SizeDev{$pid}{$dev};
+        $count = $CountDev{$pid}{$dev};
+        $pcntio_time = $factor * $delta / (10 * $period); 
+        $pcntio_time = sprintf("%.1f",$pcn);
+    }
+
+}
+
+
+
+#########################
+# --- SUBROUTINES ---
+#
+
+
+# Load_DeviceInfo - Loads general device info for devicename lookups
+#
+sub Load_DeviceInfo {
+    #
+    #  Store device number to device filename lookup in %DeviceFile
+    #
+    foreach $file (</dev/dsk/*>) {
+        @Stat = stat($file);
+        if ($Bit == 64) {
+            ($major,$minor) = unpack('nn',pack('N',$Stat[6]));
+            $major *= 2**30;
+            $filedev = $major + $minor;
+        } else {
+            $filedev = $Stat[6];
+        }
+        $DeviceFile{$filedev} = $file;
+        $devicefiles .= "$filedev:$file\n";     # for output file
+    }
+
+    #
+    #  Get mount point info in %MountPoint
+    #
+    open(MNTTAB,"/etc/mnttab") || 
+        die "ERROR8: Can't read /etc/mnttab: $!\n";
+
+    while ($line = <MNTTAB>) {
+        ($fs,$mount,$rest) = split(' ',$line,3);
+        $MountPoint{$fs} = $mount;
+        $mountpoints .= "$fs:$mount\n";         # for output file
+    }
+    close MNTTAB;
+}
+
+
+# Get_DeviceName - Gets the mount point or block device name from the
+#               extended device number
+#
+sub Get_DeviceName {
+    my $dev = shift;
+    my ($line,$rest,$file,$mount);
+    
+    ### Quick fetch if already known
+    if (defined $DeviceName{$dev}) { return $DeviceName{$dev}; }
+
+    #
+    #  Generate device name
+    #
+    $file = $DeviceFile{$dev};
+    if (defined $file) {
+        $DeviceName{$dev} = $file;
+        if (defined $MountPoint{$file}) { 
+            $DeviceName{$dev} .= ", $MountPoint{$file}";
+        }
+    } else {
+        $DeviceName{$dev} = $dev;
+    }
+
+    ### Return
+    return $DeviceName{$dev};
+}
+
+
+# Usage - print a usage message and exit.
+#
+sub Usage {
+    print STDERR <<END;
+psio10 ver 0.71
+USAGE: psio10 [-efhmnx] [seconds]
+       psio10 [-efhnx] -i infile
+       psio10 -o outfile [seconds]
+   eg,
+      psio10 5           # 5 second sample
+      psio10 -x          # extended output, %I/Ot %I/Os %I/Oc %CPU and %MEM
+      psio10 -e          # event listing (raw and verbose)
+      psio10 --help      # print full help
+END
+    exit (1);
+}
+
+
+# Help - print help. Actually strip it from the comments
+#               at the top of the code.
+#
+sub Help {
+    open (MYSELF,"$0") || die "ERROR8: I can't see myself: $!\n";
+    @Myself = <MYSELF>;
+    close MYSELF;
+
+    ### Print comment from top of code
+    foreach $line (@Myself) {
+        last if $line !~ /^#/;
+        last if $line =~ /^# Todo:/;
+        next if $line =~ m:^#!/usr/bin/perl:;
+        $line =~ s/^# //;
+        $line =~ s/^#//;
+        print $line;
+    }
+    print "\n";
+
+    exit(0);
+}
+
+

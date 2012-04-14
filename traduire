@@ -1,0 +1,67 @@
+#! /bin/bash 
+verifierLangue() {
+	liste=${langues/$langue/};
+	if [ ${#liste} -eq ${#langues} ]; then
+		echo "La langue '$langue' n'est pas supportée par Google !";
+		exit 1;
+	fi
+}
+
+# Affichage de l'aide
+if [ $# -eq 0 ]; then
+	echo "Traduction d'un mot";
+	echo "Utilisation : $0 [options] mot";
+	echo "Options :";
+	echo "-de : langue du mot saisie";
+	echo "-vers : langue de la traduction";
+	echo "pour -de et -vers, vous pouvez utiliser toutes les langues supportées par Google (de, en, fr, ru, ...)";
+	echo "Par défaut, la traduction s'effectue de l'Anglais au Français";
+	exit 1;
+fi
+
+# Langues supportées
+langues="ar|de|en|es|fr|it|ja|ko|nl|pt|ru|zh|zh-CN|zh-TW";
+
+# Traductions autorisées par Google
+traductions="fr|nl,nl|fr,ar|en,zh|en,zh-CN|zh-TW,zh-TW|zh-CN,en|ar,en|zh-CN,en|zh-TW,en|fr,en|de,en|it,en|ja,en|ko,en|pt,en|ru,en|es,fr|en,fr|de,de|en,de|fr,it|en,ja|en,ko|en,pt|en,ru|en,es|en";
+
+# Lecture des arguments
+de='fr';
+vers='nl';
+while [ $# -ge 1 ]; do
+	case $1 in
+	-de)
+		langue=$2;
+		verifierLangue;
+		de=$langue;
+		shift;
+		;;
+	-vers)
+		langue=$2;
+		verifierLangue;
+		vers=$langue;
+		shift;
+		;;
+	*)
+		mot=$1;
+		;;
+	esac
+	shift;
+done
+if [ ${#mot} -eq 0 ]; then
+	echo "Vous devez indiquer le terme à traduire !";
+	exit 1;
+fi
+traduction="$de|$vers";
+liste=${traductions/$traduction/};
+if [ ${#liste} == ${#traductions} ]; then
+	echo "La traduction de '$de' vers '$vers' n'est pas supportée par Google !";
+	exit 1;
+fi
+#resultat=`wget -q -U "" -O - "http://translate.google.com/translate_t?text=$mot&langpair=$traduction" | grep "result_box[^,]" | sed "s/.*result_box[^>]*>//" | cut -f1 -d '<'`;
+#resultat=`wget -q -U "" -O - "http://translate.google.com/translate_t?text=$mot&langpair=$traduction" | grep 'result_box'  |awk -F'"ltr">' '{print $2}' | awk -F'<' '{print $1}'`;
+
+filter=`echo $mot | awk '{print $1}'xi`
+resultat=`wget -q -U "" -O - "http://translate.google.com/translate_t?text=$mot&langpair=$traduction" | sed -e 's/</\n</g' | grep title | grep $filter| tail -1 | awk -F '>' '{print $2}'`;
+
+echo "$resultat";

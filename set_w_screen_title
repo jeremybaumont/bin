@@ -1,0 +1,4 @@
+#!/bin/bash
+HOST=`hostname | awk -F'.' '{print $1}'`
+echo -ne "\ek$HOST\e\\" 
+exit 0

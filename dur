@@ -1,0 +1,236 @@
+#!/usr/bin/perl
+#
+# dur - Disk|Directory Usage Reporter
+#       Perl utility to check disk space utilisation
+#
+# The utility displays the disk usage:
+#    - total number of files
+#    - top big files
+#    - extra info: aging files, directories
+#
+# USAGE: dur [-d] [-Tn] directory
+#   eg, dur /usr           # top 5 big files for /usr
+#       dur -T5 /opt       # top 5 big files for /opt
+#       dur -T10 /         # top 10 big files for /
+#       dur -d /opt        # directory usage for /opt
+#
+#
+# NOTES:
+# It is highly recommended to use standard File::Find Perl module
+# when trying to process each file from a deep directory structure. 
+# Some folks are writting their own rutine based on find(1) in Perl. 
+# This sometimes will be slower than File::Find so make sure you 
+# test this before you will run it in live production systems.
+#
+# There are a lot of talks over File::Find and its memory consumption and
+# how can you minimize that. Basically it very much depends. I found that
+# File::Find is much faster in Solaris 10 with a target directory of +1mil
+# files than any custom perl script calling find(1M).
+#
+# You will see a memory usage increase but the script will be faster. The
+# deeper the directory is the more memory will use.
+#
+#  Example:
+#   You can easily check how dur works against a big deep directory,
+#   over +1mil files:
+#
+#   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/NLWP      
+# 19667 sparvu    228M  219M sleep   20    0   0:01:36 8.6% dur/1
+#
+#
+# SEE ALSO:
+#  http://www.perlmonks.org/?node_id=325146
+#  
+#
+# COPYRIGHT: Copyright (c) 2007 Stefan Parvu
+#
+# 10-Dec-2006    Stefan Parvu    First Version, nawk to perl
+# 02-May-2007       "      "     Added top variable for big files
+# 13-May-2007       "      "     Added dir_usage subroutine
+# 19-May-2007       "      "     Added comments, Perl Best Practices
+
+use warnings;
+use strict;
+use File::Find;
+use Getopt::Std;
+use Time::HiRes qw(gettimeofday);
+
+
+###########
+# Variables
+###########
+my %files = ();
+my %dirs = ();
+my @sorted;
+$|=1;
+my $size = 0;
+my $mtime = 0;
+my $current_time = 0;
+
+############################
+#  Process command line args
+############################
+usage() if (($#ARGV+1)==0);
+usage() if defined $ARGV[0] and $ARGV[0] eq "-h";
+getopts('dT:s:') or usage();
+my $topN  = defined $main::opt_T ? $main::opt_T : 5;
+my $dirFlag = defined $main::opt_d ? $main::opt_d : 0;
+my $secs = defined $main::opt_s ? $main::opt_s : 0;
+
+
+#########################################
+# Usage        : find(\&fileCount, @ARGV)
+# Purpose      : counts the number, 
+#              : of bytes of each file
+# Returns      : A hash with all files
+# Parameters   : 
+# Comments     : Used from File::Find
+# See Also     : n/a
+#########################################
+sub fileCount {
+if (-f $_) {
+    if ($secs != 0) {
+        $mtime = (stat($_))[9];
+        #if ($mtime < $current_time - $secs) {
+        if (($current_time - $mtime) > $secs) {
+            $files{$File::Find::name} = -s;
+        }
+    }
+    else {
+    $files{$File::Find::name} = -s;
+    }
+}
+$mtime = 0;
+}
+
+
+
+
+#########################################
+# Usage        : find(\&fileCount, @ARGV)
+# Purpose      : counts the number,
+#              : of bytes
+# Returns      : scalar variable, with
+#              : total number of bytes
+# Parameters   :
+# Comments     : Used from File::Find 
+# See Also     : n/a
+#########################################
+sub dirCount {
+if (-f) {
+    $size += -s;
+}
+}
+
+#########################################
+# Usage        : dir_usage()
+# Purpose      : reports the directory
+#              : usage
+# Returns      : n/a
+# Parameters   : @ARGV
+# Comments     : Calls File::Find
+# See Also     : dirCount()
+#########################################
+sub dir_usage() {
+my $target = $ARGV[0];
+
+print "Processing directories...\n";
+
+opendir(D, $target) or 
+    die("Couldn't open $target for reading: $!\n");
+
+chdir "$target";
+foreach (readdir D) {
+    next if $_ =~ /^\.\.?$/;
+    next if (! -d $_);
+    find (\&dirCount, "$_");
+    $dirs{$_} = $size;
+    $size = 0;
+}
+
+closedir(D);
+
+@sorted = sort {$dirs{$b} <=> $dirs{$a}} keys %dirs;
+foreach (@sorted) {
+    printf "%6d MB => %s\n",$dirs{$_}/1048576,$_;
+}
+print "Total directories processed: " . keys(%dirs) . "\n";
+}
+
+#########################################
+# Usage        : top_files()
+# Purpose      : print top N big files
+# Returns      : n/a
+# Parameters   : @ARGV
+# Comments     : Calls File::Find,
+#              : default N=5
+# See Also     : fileCount()
+#########################################
+sub top_files {
+
+print "Processing top $topN big files...\n";
+
+#start counting here
+my $tstart = gettimeofday();
+
+find(\&fileCount, @ARGV);
+
+@sorted = sort {$files{$b} <=> $files{$a}} keys %files;
+splice @sorted, $topN if @sorted > $topN;
+
+#print scalar %files;
+
+foreach (@sorted) {
+    printf "%6d MB => %s\n", $files{$_}/1048576, $_;
+}
+
+my $tend = gettimeofday();
+my $elapsed = $tend - $tstart;
+
+#end timing
+printf "%s %4.2f %s", "Elapsed:", $elapsed, "seconds\n";
+print "Total files processed: " . keys(%files) . "\n";
+}
+
+
+#########################################
+# Usage        : usage()
+# Purpose      : print usage and exit
+# Returns      : n/a
+# Parameters   : n/a
+# Comments     : n/a
+# See Also     : n/a
+#########################################
+sub usage {
+       print STDERR <<END;
+USAGE: dur [-d] [-Tn] [-s secs] directory
+Options:
+    -d          Report subdirectories usage only
+    -Tn         Sort top n big files, default 5
+    -s secs     Search for files older than number of secs
+eg, 
+    dur /usr                     # top 5 big files for /usr
+    dur .                        # top 5 big files for . 
+    dur -T20 /                   # top 20 big files for /
+    dur -d /opt 2>/dev/null      # directory usage for /opt
+    dur -s1200  /                # top 5 big files older than
+                                 #  20 minutes for /
+    dur -s86400 /                # top 5 big files older than
+                                 #  1 day for /
+END
+       exit 1;
+}
+
+
+######
+# Main
+######
+$current_time = time();
+
+if ($#ARGV > 0) {
+    usage();
+} elsif ($dirFlag) {
+    dir_usage();
+} else { 
+    top_files();
+}

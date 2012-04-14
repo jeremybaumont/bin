@@ -1,0 +1,3 @@
+#!/bin/bash
+path=${1:-"."}
+find $path -print | sed -e 's;[^/]*/;|____;g;s;____|; |;g'

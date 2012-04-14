@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "Number of SYN_RECV connections per IP..."
+fgrep "SYN_RECV" /tmp/netstat.txt | cut -b 49-75 | cut -d ':' -f1 | sort | uniq -c | sort -n -r -k 1,7 | head -10

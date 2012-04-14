@@ -1,0 +1,2 @@
+#!/bin/bash
+script -c "TERM=vt220 screen -S termcast" -f "/tmp/termcast"

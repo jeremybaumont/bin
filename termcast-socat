@@ -1,0 +1,2 @@
+#!/bin/sh
+socat TCP-LISTEN:23,fork EXEC:"tail -f /tmp/termcast"
