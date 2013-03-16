@@ -1,11 +1,17 @@
-#!/bin/sh -x
-# git name-rev is fail
+#!/usr/bin/env bash
+
+if [ -f $HOME/bin/common-func ];then
+    source $HOME/bin/common-func
+else
+    exit 2
+fi
+
 CURRENT=`git branch | grep '\*' | awk '{print $2}'`
-echo "INFO: ship: Checkout the master branch..."
+log "INFO" "Checkout the master branch..."
 git checkout master
-echo "INFO: ship: Merge the working branch into the master branch..."
+log "INFO" "Merge the working branch into the master branch..."
 git merge ${CURRENT}
-echo "INFO: ship: Push the changes to the origin repository..."
+log "INFO" "Push the changes to the origin repository..."
 git push origin master
 git checkout ${CURRENT}
 

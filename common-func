@@ -1,19 +1,22 @@
 #!/bin/sh:w
 
+if [ -f $HOME/bin/.colors ]; then
+    source $HOME/bin/.colors
+fi
 
 EXITCODE=0
 
-attente(){
+watchdog(){
     PROC=$( pgrep  $1)
     $* &
 
     while [ -d /proc/$PROC ];do
-        echo -en ' Running, please wait... /\033[1G' ; sleep .07
-        echo -en ' Running, please wait... -\033[1G' ; sleep .07
-        echo -en ' Running, please wait... \ \033[1G' ; sleep .07
-        echo -en ' Running, please wait... |\033[1G' ; sleep .07
-# echo -en ' <DesEspacesIciSiBesoin> \033[1G'
-        done
+	echo -en ' Running, please wait... /\033[1G' ; sleep .07
+	echo -en ' Running, please wait... -\033[1G' ; sleep .07
+	echo -en ' Running, please wait... \ \033[1G' ; sleep .07
+	echo -en ' Running, please wait... |\033[1G' ; sleep .07
+	# echo -en ' <DesEspacesIciSiBesoin> \033[1G'
+    done
 
 }
 
@@ -61,18 +64,31 @@ log()
     local type="$1"
     shift
     local message="$*"
-    local dataflags="+%Y.%m.%d,%H:%M:%S"
- 
-    echo "[$type] - `date $dataflags` - $message"
+    local dataflags="+%Y-%m-%d_%H:%M:%S"
+
+
+    case "$type" in
+	"INFO" ) col=${txtblu} 
+	    ;;
+	"WARN" ) col=${txtylw} 
+	    ;;
+	"ERRO" ) col=${txtred} 
+	    ;;
+	"DBUG" ) col=${txtcyn} 
+	    ;;
+	*     ) col="";;
+    esac
+
+    echo -e "${col}[$type] - `date $dataflags` - $message${txtrst}"
 }
 
 
 # Log messages are printed only if the _DEBUG variable is set to true.
 # shell> _DEBUG=true ./example_script.sh
-_debug() {
-  if [ "$_DEBUG" == "true" ]; then
-    echo 1>&2 "$@"
-  fi
+debug () {
+    if [ "$_DEBUG" == "true" ]; then
+	echo 1>&2 "${txtcyn}$@${txtrst}"
+    fi
 }
 
 
@@ -83,13 +99,13 @@ _debug() {
 test_mail_client()
 {
     for MAIL in /bin/mailx /usr/bin/mailx /usr/sbin/mailx /usr/ucb/mailx \
-            /bin/mail /usr/bin/mail
-    do
-        test -x $MAIL && break
-    done
-    
-    test -x $MAIL || log_and_exit "ERROR" "Cannot find mail client :("
-    log "INFO" "Find a mail client: $MAIL" 
+	/bin/mail /usr/bin/mail
+do
+    test -x $MAIL && break
+done
+
+test -x $MAIL || log_and_exit "ERROR" "Cannot find mail client :("
+log "INFO" "Find a mail client: $MAIL" 
 }
 
 # Let the user make a choice about something and execute code based on
@@ -98,9 +114,9 @@ test_mail_client()
 # Called like: choose <default (y or n)> <prompt> <yes action> <no
 # action>
 # e.g. choose "y" \
-#       "Do you want to play a game?" \
-#       /usr/games/GlobalThermonucularWar \
-#       'printf "%b" "See you later Professor Falkin."' >&2
+    #       "Do you want to play a game?" \
+    #       /usr/games/GlobalThermonucularWar \
+    #       'printf "%b" "See you later Professor Falkin."' >&2
 # Returns: nothing
 choose ()
 {
@@ -116,15 +132,15 @@ choose ()
 
     [ -z "$answer" ] && answer="$default"
     case "$answer" in
-        [yY1] ) log "INFO" $choice_yes 
-	     $choice_yes 
-             # error check
-             ;;
-        [nN0] ) log_and_exit "ERROR" $choice_no 
+	[yY1] ) log "INFO" $choice_yes 
+	    $choice_yes 
+	    # error check
+	    ;;
+	[nN0] ) log_and_exit "ERROR" $choice_no 
 
-            # error check
-            ;;
-         *     ) log "WARNING"  "Unexpected answer '$answer'!";;
+	    # error check
+	    ;;
+	*     ) log "WARNING"  "Unexpected answer '$answer'!";;
     esac
 } 
 

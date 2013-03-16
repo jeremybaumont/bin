@@ -1,11 +1,17 @@
-#!/bin/sh -x
-# git name-rev is fail
+#!/usr/bin/env bash 
+
+if [ -f $HOME/bin/common-func ];then
+    source $HOME/bin/common-func
+else
+    exit 2
+fi
+
 CURRENT=`git branch | grep '\*' | awk '{print $2}'`
-echo "INFO: hack: Checkout the master branch..."
+log "INFO"  "Checkout the master branch..."
 git checkout master
-echo "INFO: hack: Update the master branch with remote origin one..."
+log "INFO" "Update the master branch with remote origin one..."
 git pull origin master
-echo "INFO: hack: Checkout the working branch..."
+log "INFO" "Checkout the working branch..."
 git checkout ${CURRENT}
-echo "INFO: hack: Rebase the master branch into the working branch..."
+log "INFO" "Rebase the master branch into the working branch..."
 git rebase master
