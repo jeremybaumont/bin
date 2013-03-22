@@ -1,0 +1,20 @@
+#!/usr/bin/env bash 
+
+if [ -f $HOME/bin/common-func ];then
+    source $HOME/bin/common-func
+else
+    exit 2
+fi
+
+CURRENT=`git branch | grep '\*' | awk '{print $2}'`
+log "INFO"  "Checkout the master branch..."
+git checkout master
+log "INFO"  "Fetch upstream's master branch..."
+git fetch upstream
+git branch -va
+log "INFO" "Merge upstream 's master with local master..."
+git merge upstream/master 
+log "INFO" "Checkout the working branch..."
+git checkout ${CURRENT}
+log "INFO" "Rebase the master branch into the working branch..."
+git rebase master
