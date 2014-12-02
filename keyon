@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+for key in `find $HOME/.ssh -type f -name id_\* -print | grep -v pub`;do echo "Adding key $key...";ssh-add $key; done
