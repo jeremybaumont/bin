@@ -12,11 +12,11 @@ else
 	connect_string="$userdb/$pass@$tnsname"
 fi
 
-SQL_DIR="$HOME/devel/sql"
+SQL_DIR="$SQLPATH"
 if [ -d "$SQL_DIR" ] 
 then
 	cd $SQL_DIR
-	rlwrap -pred -D2 -irc -b '@(){}[],+=&^%#;|' -f ~/devel/sql/setup/wordfile_11gR2.txt sqlplus ${connect_string}
+	rlwrap -pred -D2 -irc -b '@(){}[],+=&^%#;|' -f $SQLPATH/setup/wordfile_11gR2.txt sqlplus ${connect_string}
 else
     echo -e "Error could not find sql directory: $SQL_DIR"
 fi
