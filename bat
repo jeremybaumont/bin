@@ -7,11 +7,11 @@ then
 else
     if [ $BAT_PERC -lt 50 ]
     then
-	echo "#[fg=orange,bright]${BAT_PERC}%#[fg=white,default]"
+	echo "#[fg=yellow,bright]${BAT_PERC}%#[fg=white,default]"
     else
 	if [ $BAT_PERC -lt 90 ]
 	then
-	    echo "#[fg=yellow,bright]${BAT_PERC}%#[fg=white,default]"
+	    echo "#[fg=yellow,default]${BAT_PERC}%#[fg=white,default]"
 	else
 
 	    echo "#[fg=green,bright]${BAT_PERC}%#[fg=white,default]"
