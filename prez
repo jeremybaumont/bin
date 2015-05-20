@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+
+
+ProgName=$(basename $0)
+
+initialize(){
+  # Check existing curl command
+  CURL=`which curl`
+  test -z $CURL  && { echo "Error: could not find curl command"; fail="1"; }
+
+  # Check existing curl command
+  GIT=`which git`
+  test -z $GIT  && { echo "Error: could not find git command"; fail="1"; }
+
+  # Check existing directory where talks local git repo are created
+   test -z $PREZ_DIR  && { echo "Error: could not find PREZ_DIR env variable"; 
+                           fail="1"; }
+   test -d $PREZ_DIR  || { echo "Error: PREZ_DIR not a directory"; 
+                           fail="1"; }
+
+  # Check OAUTH-TOKEN environment variable exists
+   test -z $PREZ_OAUTH_TOKEN  && { echo "Error: could not find PREZ_OAUTH_TOKEN env variable"; 
+                           fail="1"; }
+   check_oauth_token=`$CURL --silent -H "Authorization: token $PREZ_OAUTH_TOKEN" https://api.github.com| grep "Bad credentials" | wc -l`			   
+   test "${check_oauth_token}" == "1" && { echo "Error: could not query github api with OAUTH token"; fail="1"; }
+
+  # Check github api access
+  test -z $fail ||
+    {
+      echo "Error: some pre-requirements are not fullfilled" >&2
+      echo "       Run '$ProgName --help' for a list of requirements." >&2
+      exit 1
+    }
+}
+
+sub_help(){
+  echo "Usage: $ProgName <subcommand> [options]"
+  echo "Subcommands:"
+  echo "    setup   Setup a workspace for a talk with reveal.js and github pages"
+  echo "    show    Display a talk on a browser"
+  echo "    print   Print a talk in pdf format"
+  echo "    theme   Manage the theme of a talk"
+  echo "    publish Publish a talk to you github pages"
+  echo ""
+  echo "Requirements/environment variables:"
+  echo "    PREZ_OAUTH_TOKEN OAUTH token github authentication for prez application"
+  echo "    GITHUB_LOGINi Github account"
+  echo "    PREZ_DIR environment variable where your talks will be locally saved"
+  echo ""
+  echo ""
+  echo "For help with each subcommand run:"
+  echo "$ProgName <subcommand> -h|--help"
+  echo ""
+}
+
+create_local_git_repo(){
+  repo_name=$1
+  mkdir -p $PREZ_DIR/$repo_name
+  cd $PREZ_DIR/$repo_name
+  $GIT init -q 
+}
+
+download_reveal(){
+  repo_name=$1
+  cd $PREZ_DIR/$repo_name
+  $CURL --silent -L https://github.com/hakimel/reveal.js/tarball/master | tar -zx --strip-components 1 -
+}
+
+clean_git_repo(){
+  repo_name=$1
+  cd $PREZ_DIR/$repo_name
+  rm -rf test CONTRIBUTING.md README.md LICENSE
+}
+
+create_github_repo(){
+  repo_name=$1
+  $CURL --silent -H "X-OAuth-Scopes: public_repo" -H "Authorization: token ${PREZ_OAUTH_TOKEN}"   -X POST --data "{\"name\":\"${repo_name}\"}"  https://api.github.com/user/repos
+}
+
+sub_setup(){
+  echo "Running 'setup' command."
+  arg=$1
+  case $arg in
+    "" | "-h" | "--help")
+      echo "Usage: $ProgName setup TALK_NAME\n"
+      echo "Subcommands:"
+      echo "    setup   Setup a workspace for a talk with reveal.js and github pages"
+      ;;
+    *)
+      shift
+      talk_name=$arg	
+      create_local_git_repo $talk_name
+      download_reveal $talk_name
+      clean_git_repo  $talk_name
+      create_github_repo $talk_name
+      ;;
+  esac
+}
+
+sub_show(){
+  echo "Running 'show' command."
+}
+
+sub_print(){
+  echo "Running 'print' command."
+}
+
+
+sub_theme(){
+  echo "Running 'theme' command."
+}
+
+sub_publish(){
+  echo "Running 'publish' command."
+}
+
+subcommand=$1
+case $subcommand in
+  "" | "-h" | "--help")
+    sub_help
+    ;;
+  *)
+    shift
+    initialize
+    sub_${subcommand} $@
+    if [ $? = 127 ]; then
+      echo "Error: '$subcommand' is not a known subcommand." >&2
+      echo "       Run '$ProgName --help' for a list of known subcommands." >&2
+      exit 1
+    fi
+    ;;
+esac
