@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/env bash
+REMOTE=${1:-"origin"}
 
 if [ -f $HOME/bin/common-func ];then
     source $HOME/bin/common-func
@@ -11,8 +12,8 @@ log "INFO" "Checkout the master branch..."
 git checkout master
 log "INFO" "Merge the working branch into the master branch..."
 git merge ${CURRENT}
-log "INFO" "Push the changes to the origin repository..."
-git push origin master
+log "INFO" "Push the changes to the $REMOTE repository..."
+git push $REMOTE master
 git checkout ${CURRENT}
 
 
