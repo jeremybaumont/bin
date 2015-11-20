@@ -1,7 +1,0 @@
-#!/bin/bash
-
-rm /tmp/shorturl
-
-wget -q "http://api.bit.ly/v3/shorten?login=rodeeend&apiKey=R_26b905aa46ce3857a9fbd936f0f0ff2d&longUrl=$1&format=txt" -O /tmp/shorturl
-
-cat /tmp/shorturl

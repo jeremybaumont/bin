@@ -1,6 +1,0 @@
-#!/bin/bash
-xset -dpms
-xset s off
-xrandr --output VGA --mode 1024×768 --rate 60 #--pos 0×25
-# xset -dpms
-#xset s off

@@ -1,6 +1,0 @@
-#!/bin/sh
-##
-## to save a patch I am working on and revert it from the working tree
-## git diff > diff
-## git checkout-index $(mkcf diff); git update-index --refresh
-diffstat -p 1 $* | grep -v changed | awk '{print $1}'

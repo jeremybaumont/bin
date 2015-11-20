@@ -1,8 +1,0 @@
-#!/bin/ksh
-kstat cpu_info | \
-    egrep "cpu_info |core_id" | \
-    awk \
-        'BEGIN { printf "%4s %4s", "CPU", "core" } \
-         /module/ { printf "\n%4s", $4 } \
-         /core_id/ { printf "%4s", $2} \
-         END { printf "\n" }'

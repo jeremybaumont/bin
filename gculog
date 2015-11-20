@@ -1,4 +1,0 @@
-#!/bin/bash
-DATE=$1
-: ${DATE:=`date +%Y%m%d`}
- wget -q -O - --post-data logdate=$DATE http://www.gcu.info/gcu-live/ | grep 'gcu_author' | grep http| awk -F'http' '{print "http"  $2}' | awk -F'<' '{print $1}' | egrep -v 'youtube|4chan|flickr|lemonde.fr|wikipedia|rue89.com|fukung.net'| less
