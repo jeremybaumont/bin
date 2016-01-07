@@ -2,7 +2,7 @@
 shopt -s nocasematch
 
 # weather station id from Amsterdam
-WEATHER_STATION=06240
+WEATHER_STATION="INSWBARA2"
 URL="http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID="
 
 if [ ! -z "$WEATHER_STATION" ]
@@ -17,6 +17,7 @@ then
     [[ $WEATHER =~ snow ]] && ICON="☃"
     [[ $WEATHER =~ sun ]] && ICON="☀"
 
+    TEMP=`echo "($TEMP+0.5)/1" | bc`
     if [ $TEMP -lt 6 ]
     then
 	echo "$ICON #[fg=blue,bright]${TEMP}°C#[fg=white,default]"
