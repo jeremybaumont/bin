@@ -24,7 +24,7 @@ then
     else
 	if [ $TEMP -gt 25 ]
 	then
-	    echo "$ICON #[fg=yellow,bright]${TEMP}°C#[fg=white,default]"
+	    echo "$ICON #[fg=red,bright]${TEMP}°C#[fg=white,default]"
 	else
 	    echo "$ICON ${TEMP}°C"
 	fi
