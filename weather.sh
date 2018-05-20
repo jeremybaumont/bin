@@ -2,7 +2,7 @@
 shopt -s nocasematch
 
 # weather station id from Amsterdam
-WEATHER_STATION="INSWBARA2"
+WEATHER_STATION="YSSY"
 URL="http://api.wunderground.com/weatherstation/WXCurrentObXML.asp?ID="
 
 if [ ! -z "$WEATHER_STATION" ]

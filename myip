@@ -1,0 +1,1 @@
+ifconfig -a |awk '/en0/ {found=1}; found == 1 && /inet / { print $2; found=0}'
